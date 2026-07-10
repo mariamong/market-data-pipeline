@@ -33,7 +33,7 @@ def ingest_companies():
 
 def ingest_prices():
     for ticker in TICKERS:
-        df = yf.download(ticker, start="2024-01-01", end="2024-12-31", auto_adjust=True)
+        df = yf.download(ticker, start="2026-02-01", end="2026-07-07", auto_adjust=True)
         df = df.reset_index()
         df.columns = [c[0].lower() if isinstance(c, tuple) else c.lower() for c in df.columns]
         df = df.rename(columns={"date": "date"})
