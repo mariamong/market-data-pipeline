@@ -58,7 +58,7 @@ coverage = prices.groupby("source").agg(
     latest=("date", "max"),
     total_records=("date", "count")
 ).reset_index()
-st.dataframe(coverage, use_container_width=True)
+st.dataframe(coverage, width='stretch')
 
 st.divider()
 
@@ -70,7 +70,7 @@ if len(validation) == 0:
 else:
     issue_counts = validation.groupby("issue_type").size().reset_index(name="count")
     st.bar_chart(issue_counts.set_index("issue_type"))
-    st.dataframe(validation, use_container_width=True)
+    st.dataframe(validation, width='stretch')
 
 st.divider()
 
@@ -86,4 +86,4 @@ if len(filtered) == 0:
     st.warning("No data for this combination.")
 else:
     st.line_chart(filtered.set_index("date")[["close", "high", "low"]])
-    st.dataframe(filtered, use_container_width=True)
+    st.dataframe(filtered, width='stretch')
