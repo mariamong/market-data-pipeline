@@ -31,17 +31,26 @@ def ingest_companies():
         conn.commit()
     print(f"Processed {len(df)} companies")
 
+
 def ingest_prices():
     for ticker in TICKERS:
         df = yf.download(ticker, start="2026-02-01", end="2026-07-07", auto_adjust=True)
         df = df.reset_index()
         df.columns = [c[0].lower() if isinstance(c, tuple) else c.lower() for c in df.columns]
-        df = df.rename(columns={"date": "date"})
         df["ticker"] = ticker
         df["source"] = "yfinance"
         df = df[["ticker", "date", "open", "high", "low", "close", "volume", "source"]]
-        df.to_sql("raw_prices", engine, if_exists="append", index=False, method="multi")
+
+        with engine.connect() as conn:
+            for _, row in df.iterrows():
+                conn.execute(text("""
+                    INSERT INTO raw_prices (ticker, date, open, high, low, close, volume, source)
+                    VALUES (:ticker, :date, :open, :high, :low, :close, :volume, :source)
+                    ON CONFLICT (ticker, date, source) DO NOTHING
+                """), row.to_dict())
+            conn.commit()
         print(f"Inserted {len(df)} rows for {ticker}")
+
 
 if __name__ == "__main__":
     ingest_companies()
