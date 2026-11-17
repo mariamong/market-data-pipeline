@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import streamlit as st
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -26,6 +26,20 @@ def load_validation_log():
 def load_companies():
     with engine.connect() as conn:
         return pd.read_sql("SELECT * FROM companies", conn)
+
+@st.cache_data
+def load_comparison():
+    query = text("""
+        SELECT y.ticker, y.date,
+               y.close::float AS yfinance_close,
+               a.close::float AS alphavantage_close,
+               (ABS(y.close - a.close) / y.close * 100)::float AS gap_pct
+        FROM raw_prices y
+        JOIN raw_prices a ON y.ticker = a.ticker AND y.date = a.date
+        WHERE y.source = 'yfinance' AND a.source = 'alphavantage'
+    """)
+    with engine.connect() as conn:
+        return pd.read_sql(query, conn)
 
 prices = load_prices()
 validation = load_validation_log()
@@ -74,30 +88,21 @@ else:
 
 st.divider()
 
+# ── Source comparison ─────────────────────────────────────────────────────────
 
-import pandas as pd
-from sqlalchemy import text
-
-st.header("Source Comparison")
+st.subheader("Source Comparison")
 threshold = st.slider("Flag close-price gaps above (%)", 0.1, 2.0, 2.0, 0.1)
 
-query = """
-SELECT y.ticker, y.date,
-       y.close AS yfinance_close,
-       a.close AS alphavantage_close,
-       ABS(y.close - a.close) / y.close * 100 AS gap_pct
-FROM raw_prices y
-JOIN raw_prices a ON y.ticker = a.ticker AND y.date = a.date
-WHERE y.source = 'yfinance' AND a.source = 'alphavantage'
-"""
-comparison = pd.read_sql(text(query), engine)
+comparison = load_comparison()
 flagged = comparison[comparison["gap_pct"] > threshold]
 
 c1, c2, c3 = st.columns(3)
 c1.metric("Days compared", len(comparison))
 c2.metric("Largest gap (%)", f"{comparison['gap_pct'].max():.2f}")
 c3.metric("Flagged at threshold", len(flagged))
-st.dataframe(flagged.sort_values("gap_pct", ascending=False))
+st.dataframe(flagged.sort_values("gap_pct", ascending=False), width='stretch')
+
+st.divider()
 
 # ── Price explorer ────────────────────────────────────────────────────────────
 
@@ -112,5 +117,3 @@ if len(filtered) == 0:
 else:
     st.line_chart(filtered.set_index("date")[["close", "high", "low"]])
     st.dataframe(filtered, width='stretch')
-
-
