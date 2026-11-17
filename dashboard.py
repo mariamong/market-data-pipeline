@@ -74,6 +74,31 @@ else:
 
 st.divider()
 
+
+import pandas as pd
+from sqlalchemy import text
+
+st.header("Source Comparison")
+threshold = st.slider("Flag close-price gaps above (%)", 0.1, 2.0, 2.0, 0.1)
+
+query = """
+SELECT y.ticker, y.date,
+       y.close AS yfinance_close,
+       a.close AS alphavantage_close,
+       ABS(y.close - a.close) / y.close * 100 AS gap_pct
+FROM raw_prices y
+JOIN raw_prices a ON y.ticker = a.ticker AND y.date = a.date
+WHERE y.source = 'yfinance' AND a.source = 'alphavantage'
+"""
+comparison = pd.read_sql(text(query), engine)
+flagged = comparison[comparison["gap_pct"] > threshold]
+
+c1, c2, c3 = st.columns(3)
+c1.metric("Days compared", len(comparison))
+c2.metric("Largest gap (%)", f"{comparison['gap_pct'].max():.2f}")
+c3.metric("Flagged at threshold", len(flagged))
+st.dataframe(flagged.sort_values("gap_pct", ascending=False))
+
 # ── Price explorer ────────────────────────────────────────────────────────────
 
 st.subheader("Price Explorer")
@@ -87,3 +112,5 @@ if len(filtered) == 0:
 else:
     st.line_chart(filtered.set_index("date")[["close", "high", "low"]])
     st.dataframe(filtered, width='stretch')
+
+
